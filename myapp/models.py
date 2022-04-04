@@ -11,5 +11,3 @@ class business_registration(models.Model):
     class Meta:
         managed=False
         db_table='business_registration'
-    def __str__(self):
-        return self.title
