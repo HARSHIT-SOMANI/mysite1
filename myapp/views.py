@@ -1,50 +1,85 @@
-
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.parsers import JSONParser
-
+from mysite.dbconn import connection
 from myapp.models import business_registration
-from myapp.serializers import business_registrationserializer
-# Create your views here.
+
 def index(request):
-    print('inside index')
     return render(request,'index.html')
 
+@csrf_exempt
+def createUser(request):
+    cursor = connection.cursor(prepared=True)
+    data=JSONParser().parse(request)
+    name=data['name']
+    email=data['email']
+    phoneNumber=data['phoneNumber']
+    address=data['address']
+    try:
+       sql_lastentry_Query = "SELECT regId FROM business_registration ORDER BY regId DESC LIMIT 1"
+       cursor.execute(sql_lastentry_Query)
+       i = cursor.fetchone()
+       i=i[0]
+    except:
+       i='REG10000'
+    i=int(i[3:])+1
+    regId='REG'+str(i)
+    sql_insert_query = """ INSERT INTO business_registration (name, email, address, phoneNumber,regId) VALUES (%s,%s,%s,%s,%s)"""
+    tuple1=(name,email,address,phoneNumber,regId,)
+    cursor.execute(sql_insert_query, tuple1)
+    connection.commit()
+    data={'data':{'message' : 'user created successfully','regId':regId}}
+    return JsonResponse(data,status=201)
 
-#def user(request):
-#    print('########################insideticketlist1')
-#    if request.method=='POST':
-#        print('######cvme to sinup1')
-#        name=request.POST['name']
-#        email=request.POST['email']
-#       phoneNumber=request.POST['phoneNumber']
-#        regId=request.POST['regId']
-#        address=request.POST['address']
-#        k=business_registration.objects.create(name=name,email=email,phoneNumber=phoneNumber,regId=regId,address=address)
-#    return render(request,'index.html')
+@csrf_exempt
+def updateUser(request,input):
+    cursor = connection.cursor(prepared=True)
+    data=JSONParser().parse(request)
+    name=data['name']
+    email=data['email']
+    phoneNumber=data['phoneNumber']
+    address=data['address']
+    try:
+        sql_update_query = """ UPDATE business_registration set
+                       name =%s, email=%s, phoneNumber=%s, address=%s WHERE regId=%s"""
+        tuple2=(name,email,phoneNumber,address,input)
+        cursor.execute(sql_update_query, tuple2)
+        connection.commit()
+        data={'data':{'message':'user updated successfully'}}
+        return JsonResponse(data,status=200,safe=False)
+    except:
+        JsonResponse({'message:redId not found'},status=400)
 
-@csrf_exempt                                                    #not required for  GET request
-def user(request):
-    print('########################insideticketlist1')
-    print('#########################request is',request)
-    if request.method=='GET':
-        print('########################inside GET request')
-        #articleobjects=article.objects.Get()
-        #articleserilized=articleserializer(articleobjects)  if one object many=true is not needed
-        businesobjects=business_registration.objects.all()
-        print('##################ticketobjects is',businesobjects)
-        businessserilized=business_registrationserializer(businesobjects,many=True)
-        print('#####################ticketserilized is',businessserilized)
-        return JsonResponse(businessserilized.data,safe=False)
-    elif request.method=='POST':
-        print('########################inside POST request')
-        data=JSONParser().parse(request)
-        print('##############data is',data)
-        businessserilized=business_registrationserializer(data=data)
-        print('#####################ticketserilized',businessserilized)
-        if businessserilized.is_valid():
-            print('########################insideticketlist4')
-            businessserilized.save()
-            return JsonResponse(businessserilized.data,status=201)
-        return JsonResponse(businessserilized.errors,status=400)
+@csrf_exempt
+def deleteUser(request,input):
+    cursor = connection.cursor(prepared=True)
+    try:
+        sql_Delete_query = """Delete from  business_registration where regId = %s"""
+        tuple2=(input,)
+        cursor.execute(sql_Delete_query,tuple2)
+        connection.commit()
+        return JsonResponse({'data':{'message':'user deleted successfully'}},status=204)
+    except:
+        return JsonResponse({'data':{'message':'user not found'}},status=400)
+
+
+@csrf_exempt
+def getUser(request):
+    cursor = connection.cursor(prepared=True)
+    if 'regId' in request.GET:
+        sql_select_Query ="""select * from business_registration WHERE regId = %s"""
+        tuple2=(request.GET['regId'],)
+        cursor.execute(sql_select_Query,tuple2)
+        records = cursor.fetchone()
+    else:
+        sql_select_Query = "select * from business_registration"
+        cursor.execute(sql_select_Query)
+        records = cursor.fetchall()
+    if(records):
+        return JsonResponse(records,safe=False)
+    else:
+        return JsonResponse({'message':'No record found in database'},status=404)
+
+
+
